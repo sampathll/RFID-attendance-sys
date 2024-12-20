@@ -1,0 +1,60 @@
+// RFID based Attendance System using Arduino
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define RST_PIN 9
+#define SS_PIN 10
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+// Define a list of authorized RFID card UIDs
+const byte authorizedUIDs[][4] = {
+    {0xDE, 0xAD, 0xBE, 0xEF}, // Example UID 1
+    {0x12, 0x34, 0x56, 0x78}  // Example UID 2
+};
+const int authorizedCount = sizeof(authorizedUIDs) / sizeof(authorizedUIDs[0]);
+
+void setup() {
+    Serial.begin(9600);
+    SPI.begin();
+    rfid.PCD_Init();
+    Serial.println("RFID Attendance System Initialized");
+}
+
+void loop() {
+    if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
+        return;
+    }
+
+    Serial.print("Card UID: ");
+    for (byte i = 0; i < rfid.uid.size; i++) {
+        Serial.print(rfid.uid.uidByte[i] < 0x10 ? " 0" : " ");
+        Serial.print(rfid.uid.uidByte[i], HEX);
+    }
+    Serial.println();
+
+    if (isAuthorized(rfid.uid.uidByte, rfid.uid.size)) {
+        Serial.println("Access Granted! Attendance Recorded.");
+    } else {
+        Serial.println("Access Denied! Unauthorized Card.");
+    }
+
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+}
+
+bool isAuthorized(byte *uid, byte size) {
+    for (int i = 0; i < authorizedCount; i++) {
+        bool match = true;
+        for (byte j = 0; j < size; j++) {
+            if (authorizedUIDs[i][j] != uid[j]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+    return false;
+}
